@@ -8,8 +8,8 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --constraint=EPYC_7742
 #
-#   sbatch --array=1-60 euler/run.sbatch ellipse
-#   sbatch --array=1-60 euler/run.sbatch sphere
+#   mkdir -p out/logs && sbatch --array=1-60 euler/run.sbatch ellipse
+#   mkdir -p out/logs && sbatch --array=1-60 euler/run.sbatch sphere
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
