@@ -13,7 +13,6 @@
 #   euler/submit_ref.sh  [geom]   # single high-fidelity reference run
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
-export OPENBLAS_NUM_THREADS=1
 GEOM=$1; MODE=$2; TASKFILE=$3
 ROOT=$(pwd); R=$ROOT/out/$MODE/$GEOM; mkdir -p "$R" "$ROOT/out/logs"
 read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/$TASKFILE" | sed -n "${SLURM_ARRAY_TASK_ID}p")
