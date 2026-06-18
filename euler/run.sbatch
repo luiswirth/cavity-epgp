@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH --job-name=epgp
 #SBATCH --account=ls_math
-#SBATCH --output=out/slurm-%A_%a.log
+#SBATCH --output=out/logs/slurm-%A_%a.log
 #SBATCH --time=00:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=16
@@ -14,7 +14,7 @@ set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
 GEOM=$1
-ROOT=$(pwd); R=$ROOT/out/$GEOM; mkdir -p "$R"
+ROOT=$(pwd); R=$ROOT/out/$GEOM; mkdir -p "$R" "$ROOT/out/logs"
 read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/euler/epgp_grid.txt" | sed -n "${SLURM_ARRAY_TASK_ID}p")
 work=$R/work/ns${NS}_nb${NB}; rm -rf "$work"; mkdir -p "$work"; cd "$work"
 t0=$SECONDS
