@@ -2,7 +2,7 @@
 #SBATCH --job-name=epgp
 #SBATCH --account=ls_math
 #SBATCH --output=out/logs/slurm-%A_%a.log
-#SBATCH --time=00:30:00
+#SBATCH --time=04:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=128
 #SBATCH --mem-per-cpu=2G
@@ -32,6 +32,6 @@ echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hos
 echo "done ns${NS}nb${NB}: dofs=$dofs cond=$cond secs=$secs mem_kb=$mem_kb"
 if [[ "$MODE" == "ref" ]]; then
   srun uv run --project "$ROOT" epgp-operator field \
-    --config "$ROOT/res/config_${GEOM}.txt" --out "$R/field.npz" >> "$work/run.log" 2>&1
+    --config "$ROOT/res/config_${GEOM}.txt" --out "$R/field.npz" >> run.log 2>&1
   echo "field slice written to $R/field.npz"
 fi
