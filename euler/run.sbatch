@@ -4,15 +4,16 @@
 #SBATCH --output=out/logs/slurm-%A_%a.log
 #SBATCH --time=00:30:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=16
-#SBATCH --mem-per-cpu=2G
+#SBATCH --cpus-per-task=128
+#SBATCH --mem=0
+#SBATCH --exclusive
 #SBATCH --constraint=EPYC_7742
 #
 #   euler/submit_grid.sh [geom]   # convergence grid
 #   euler/submit_ref.sh  [geom]   # single high-fidelity reference run
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
+export OPENBLAS_NUM_THREADS=1
 GEOM=$1; MODE=$2; TASKFILE=$3
 ROOT=$(pwd); R=$ROOT/out/$MODE/$GEOM; mkdir -p "$R" "$ROOT/out/logs"
 read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/$TASKFILE" | sed -n "${SLURM_ARRAY_TASK_ID}p")
