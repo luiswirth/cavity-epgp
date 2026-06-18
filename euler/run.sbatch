@@ -5,7 +5,7 @@
 #SBATCH --time=00:30:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=128
-#SBATCH --mem=0
+#SBATCH --mem-per-cpu=4G
 #SBATCH --exclusive
 #SBATCH --constraint=EPYC_7742
 #
