@@ -30,3 +30,8 @@ mem_kb=$(grep -oE 'mem=[0-9]+' time.txt | grep -oE '[0-9]+' || true)
 echo "${NS},${NB},${dofs},${secs},${mem_kb},${cond}" >> "$R/manifest.csv"
 echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hostname),${NS},${NB},$(date -Is)" >> "$R/provenance.csv"
 echo "done ns${NS}nb${NB}: dofs=$dofs cond=$cond secs=$secs mem_kb=$mem_kb"
+if [[ "$MODE" == "ref" ]]; then
+  srun uv run --project "$ROOT" epgp-operator field \
+    --config "$ROOT/res/config_${GEOM}.txt" --out "$R/field.npz" >> "$work/run.log" 2>&1
+  echo "field slice written to $R/field.npz"
+fi
