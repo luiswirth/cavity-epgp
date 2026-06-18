@@ -1,0 +1,24 @@
+[project]
+name = "cavity-epgp"
+version = "0.1.0"
+description = "Ehrenpreis-Palamodov Gaussian-process solver for the PEC cavity reaction operator"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=2.4.4",
+    "jax>=0.8.1",
+    "optax>=0.2.6",
+    "maxwellgp",
+]
+
+[project.optional-dependencies]
+gpu = ["jax[cuda12]>=0.8.1"]
+
+[project.scripts]
+epgp-operator = "cavity_epgp.operators:main"
+
+[build-system]
+requires = ["uv_build>=0.11.17,<0.12.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+maxwellgp = { git = "ssh://git@github.com/luiswirth/maxwellgp.git", branch = "main" }
