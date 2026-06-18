@@ -2,5 +2,5 @@
 set -euo pipefail
 mkdir -p out/logs
 for geom in "${@:-ellipse sphere}"; do
-  sbatch --array=1-60 euler/run.sbatch "$geom" grid euler/epgp_grid.txt
+  sbatch --array=1-60 euler/run.sbatch "$geom" grid euler/grid.txt
 done
