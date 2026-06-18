@@ -8,14 +8,14 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --constraint=EPYC_7742
 #
-#   mkdir -p out/logs && sbatch --array=1-60 euler/run.sbatch ellipse
-#   mkdir -p out/logs && sbatch --array=1-60 euler/run.sbatch sphere
+#   euler/submit_grid.sh [geom]   # convergence grid
+#   euler/submit_ref.sh  [geom]   # single high-fidelity reference run
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK OPENBLAS_NUM_THREADS=$SLURM_CPUS_PER_TASK
-GEOM=$1
-ROOT=$(pwd); R=$ROOT/out/$GEOM; mkdir -p "$R" "$ROOT/out/logs"
-read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/euler/epgp_grid.txt" | sed -n "${SLURM_ARRAY_TASK_ID}p")
+GEOM=$1; MODE=$2; TASKFILE=$3
+ROOT=$(pwd); R=$ROOT/out/$MODE/$GEOM; mkdir -p "$R" "$ROOT/out/logs"
+read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/$TASKFILE" | sed -n "${SLURM_ARRAY_TASK_ID}p")
 work=$R/work/ns${NS}_nb${NB}; rm -rf "$work"; mkdir -p "$work"; cd "$work"
 t0=$SECONDS
 srun --cpu-bind=cores /usr/bin/time -v -o time.txt \
