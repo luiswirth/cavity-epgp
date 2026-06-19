@@ -15,7 +15,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from maxwellgp import GaussianProcess, TangentialMaxwellKernel
+from maxwellgp import GaussianProcess, MaxwellKernel
 from maxwellgp.utils import fibonacci_sphere
 
 from .analytic import incident_field_batch
@@ -92,7 +92,7 @@ def fit(cfg, semiaxes, k, Y, n_spectral):
     bnd_points, bnd_normals = boundary_collocation(semiaxes, cfg.n_boundary)
     X_train = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
 
-    kernel = TangentialMaxwellKernel(n_spectral=n_spectral, omega=k)
+    kernel = MaxwellKernel(n_spectral=n_spectral, omega=k, trace="tangential")
     log_noise = cfg.log_noise
     if cfg.opt_noise:
         log_noise, _ = optimize_log_noise(kernel, log_noise, X_train, Y, cfg.opt_steps)
@@ -124,7 +124,7 @@ def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
     model, post = fit(cfg, semiaxes, k, Y, n_spectral)
 
     X_query = jnp.asarray(np.stack([np.concatenate([x, nrm]) for x, nrm, _ in configs]))
-    field = np.asarray(post.mean(model.kernel.feature_map(X_query))).reshape(n_cfg, 3, n_cfg)
+    field = np.asarray(post.mean(model.kernel.features(X_query))).reshape(n_cfg, 3, n_cfg)
     Q = np.stack([q for _, _, q in configs])
     T = np.einsum("ic,icj->ij", Q, field)
     return T, post, model
