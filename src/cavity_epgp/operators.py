@@ -106,8 +106,10 @@ def fit(cfg, semiaxes, k, Y, n_spectral):
 def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
     """Assemble the dipole reaction operator T for one (k, n_spectral).
 
-    Returns (T, posterior, model); the posterior carries the conditioned factor
-    used for the system condition number, the model the tuned noise level.
+    Returns (T, Sigma, posterior, model); Sigma is the posterior covariance of
+    the operator entries (transmitter-independent), the posterior carries the
+    conditioned factor used for the system condition number, the model the tuned
+    noise level.
     """
     configs = []
     for i in range(len(points)):
@@ -124,10 +126,14 @@ def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
     model, post = fit(cfg, semiaxes, k, Y, n_spectral)
 
     X_query = jnp.asarray(np.stack([np.concatenate([x, nrm]) for x, nrm, _ in configs]))
-    field = np.asarray(post.mean(model.kernel.features(X_query))).reshape(n_cfg, 3, n_cfg)
-    Q = np.stack([q for _, _, q in configs])
-    T = np.einsum("ic,icj->ij", Q, field)
-    return T, post, model
+    Q = jnp.asarray(np.stack([q for _, _, q in configs]))
+    # polarization-projected query map: Psi[:, i] sums the 3 tangential
+    # components at receiver i weighted by its polarization Q[i].
+    Phi_q = model.kernel.features(X_query).reshape(-1, n_cfg, 3)
+    Psi = jnp.einsum("fic,ic->fi", Phi_q, Q)
+    T = np.asarray(post.mean(Psi))
+    Sigma = np.asarray(post.cov(Psi))
+    return T, Sigma, post, model
 
 
 # --- subcommand: reaction operator --------------------------------------------
@@ -138,16 +144,19 @@ def run_operator(args):
     ns, nb = args.n_spectral, args.n_boundary
     k, semiaxes, points, e1, e2 = load_config(args.config)
     cfg = GPConfig.from_args(args)
-    T, post, _ = assemble_operator(cfg, semiaxes, k, points, e1, e2, ns)
+    T, Sigma, post, _ = assemble_operator(cfg, semiaxes, k, points, e1, e2, ns)
 
     cond = float(np.linalg.cond(np.asarray(post.L @ post.L.conj().T)))
     recip = np.linalg.norm(T - T.T) / np.linalg.norm(T)
+    std = np.sqrt(np.clip(np.real(np.diag(Sigma)), 0.0, None))
     os.makedirs(args.outdir, exist_ok=True)
     out = os.path.join(args.outdir, f"T_ns{ns}_nb{nb}.npy")
     np.save(out, T)
+    np.save(os.path.join(args.outdir, f"Sigma_ns{ns}_nb{nb}.npy"), Sigma)
     print(f"dofs={2 * ns}")
     print(f"cond={cond:.6e}")
     print(f"recip={recip:.3e}")
+    print(f"mean_std={std.mean():.6e}")
     print(f"wrote {out}")
 
 
@@ -171,12 +180,15 @@ def run_field(args):
     XX, ZZ = np.meshgrid(xs, zs)
     pts = np.stack([XX.ravel(), np.zeros(XX.size), ZZ.ravel()], axis=1)
 
-    chunks = []
+    mean_chunks, var_chunks = [], []
     for i in range(0, len(pts), args.batch):
         phi = model.kernel.feature_map.full(jnp.asarray(pts[i : i + args.batch]))
-        chunks.append(np.asarray(post.mean(phi)))
-    field6 = np.concatenate(chunks).reshape(-1, 6)
+        mean_chunks.append(np.asarray(post.mean(phi)))
+        var_chunks.append(np.asarray(post.var(phi)))
+    field6 = np.concatenate(mean_chunks).reshape(-1, 6)
+    var6 = np.concatenate(var_chunks).reshape(-1, 6)
     Escat = field6[:, :3]
+    Escat_std = np.sqrt(var6[:, :3])  # posterior std of the scattered E field
     Einc = incident_field_batch(pts, z, k, p)
     Etot = Einc + Escat
 
@@ -187,6 +199,7 @@ def run_field(args):
         args.out,
         xs=xs, zs=zs,
         Escat=Escat.reshape(ng, ng, 3),
+        Escat_std=Escat_std.reshape(ng, ng, 3),
         Einc=Einc.reshape(ng, ng, 3),
         Etot=Etot.reshape(ng, ng, 3),
         mask=inside.reshape(ng, ng),
