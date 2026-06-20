@@ -158,7 +158,7 @@ def run_operator(args):
     ns, nb = args.n_spectral, args.n_boundary
     k, semiaxes, points, e1, e2 = load_config(args.config)
     cfg = GPConfig.from_args(args)
-    T, Sigma, nlml, post, _ = assemble_operator(cfg, semiaxes, k, points, e1, e2, ns)
+    T, Sigma, nlml, post, model = assemble_operator(cfg, semiaxes, k, points, e1, e2, ns)
 
     cond = float(np.linalg.cond(np.asarray(post.L @ post.L.conj().T)))
     recip = np.linalg.norm(T - T.T) / np.linalg.norm(T)
@@ -171,7 +171,7 @@ def run_operator(args):
     print(f"cond={cond:.6e}")
     print(f"recip={recip:.3e}")
     print(f"mean_std={std.mean():.6e}")
-    print(f"log_noise={cfg.log_noise:.6f}")
+    print(f"log_noise={float(model.log_noise):.6f}")
     print(f"nlml={nlml:.6e}")
     print(f"wrote {out}")
 
