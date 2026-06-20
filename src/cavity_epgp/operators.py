@@ -103,13 +103,26 @@ def fit(cfg, semiaxes, k, Y, n_spectral):
 
 # --- reaction operator assembly -----------------------------------------------
 
+def _nlml(post, model, Y):
+    # Marginal likelihood reusing the conditioned factor (no re-factorization):
+    # Phi_Y = A mu_w = L (L^H mu_w), and the nlml fit term is <Phi_Y, mu_w>.
+    L, w = post.L, post.mu_w
+    M, J = Y.shape
+    Phi_Y = L @ (L.conj().T @ w)
+    data_fit = 0.5 * (jnp.vdot(Y, Y).real / jnp.exp(model.log_noise)
+                      - jnp.sum((Phi_Y.conj() * w).real))
+    logdet_A = 2.0 * jnp.sum(jnp.log(jnp.diagonal(L).real))
+    logdet_C = logdet_A + M * model.log_noise - jnp.sum(model.kernel.log_weights)
+    return float(data_fit + J * (0.5 * logdet_C + 0.5 * M * jnp.log(2.0 * jnp.pi)))
+
+
 def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
     """Assemble the dipole reaction operator T for one (k, n_spectral).
 
-    Returns (T, Sigma, posterior, model); Sigma is the posterior covariance of
-    the operator entries (transmitter-independent), the posterior carries the
-    conditioned factor used for the system condition number, the model the tuned
-    noise level.
+    Returns (T, Sigma, nlml, posterior, model); Sigma is the posterior covariance
+    of the operator entries (transmitter-independent), nlml the marginal
+    likelihood of the boundary fit, the posterior carries the conditioned factor
+    used for the system condition number, the model the noise level.
     """
     configs = []
     for i in range(len(points)):
@@ -133,7 +146,8 @@ def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
     Psi = jnp.einsum("fic,ic->fi", Phi_q, Q)
     T = np.asarray(post.mean(Psi))
     Sigma = np.asarray(post.cov(Psi))
-    return T, Sigma, post, model
+    nlml = _nlml(post, model, Y)
+    return T, Sigma, nlml, post, model
 
 
 # --- subcommand: reaction operator --------------------------------------------
@@ -144,7 +158,7 @@ def run_operator(args):
     ns, nb = args.n_spectral, args.n_boundary
     k, semiaxes, points, e1, e2 = load_config(args.config)
     cfg = GPConfig.from_args(args)
-    T, Sigma, post, _ = assemble_operator(cfg, semiaxes, k, points, e1, e2, ns)
+    T, Sigma, nlml, post, _ = assemble_operator(cfg, semiaxes, k, points, e1, e2, ns)
 
     cond = float(np.linalg.cond(np.asarray(post.L @ post.L.conj().T)))
     recip = np.linalg.norm(T - T.T) / np.linalg.norm(T)
@@ -157,6 +171,8 @@ def run_operator(args):
     print(f"cond={cond:.6e}")
     print(f"recip={recip:.3e}")
     print(f"mean_std={std.mean():.6e}")
+    print(f"log_noise={cfg.log_noise:.6f}")
+    print(f"nlml={nlml:.6e}")
     print(f"wrote {out}")
 
 

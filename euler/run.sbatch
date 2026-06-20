@@ -24,11 +24,14 @@ srun --cpu-bind=cores /usr/bin/time -f "elapsed=%e mem=%M" -o time.txt \
 log=$(cat run.log); echo "$log"
 dofs=$(echo "$log" | grep -oE 'dofs=[0-9]+' | grep -oE '[0-9]+')
 cond=$(echo "$log" | grep -oE 'cond=[0-9.eE+-]+' | grep -oE '[0-9.eE+-]+$')
+log_noise=$(echo "$log" | grep -oE 'log_noise=[0-9.eE+-]+' | grep -oE '[0-9.eE+-]+$')
+nlml=$(echo "$log" | grep -oE 'nlml=[0-9.eE+-]+' | grep -oE '[0-9.eE+-]+$')
 secs=$(grep -oE 'elapsed=[0-9.]+' time.txt | grep -oE '[0-9.]+' | cut -d. -f1 || true)
 mem_kb=$(grep -oE 'mem=[0-9]+' time.txt | grep -oE '[0-9]+' || true)
 # manifest columns: n_spectral,n_boundary,dofs,secs,mem_kb,cond
 echo "${NS},${NB},${dofs},${secs},${mem_kb},${cond}" >> "$R/manifest.csv"
-echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hostname),${NS},${NB},$(date -Is)" >> "$R/provenance.csv"
+# provenance columns: git,host,n_spectral,n_boundary,date,log_noise,nlml
+echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hostname),${NS},${NB},$(date -Is),${log_noise},${nlml}" >> "$R/provenance.csv"
 echo "done ns${NS}nb${NB}: dofs=$dofs cond=$cond secs=$secs mem_kb=$mem_kb"
 if [[ "$MODE" == "ref" ]]; then
   srun uv run --project "$ROOT" epgp-operator field \
