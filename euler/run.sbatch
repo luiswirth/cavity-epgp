@@ -19,7 +19,7 @@ read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/$TASKFILE" | sed -n "${SLURM_ARR
 work=$R/work/ns${NS}_nb${NB}; rm -rf "$work"; mkdir -p "$work"; cd "$work"
 srun --cpu-bind=cores /usr/bin/time -f "elapsed=%e mem=%M" -o time.txt \
   uv run --project "$ROOT" epgp-operator operator \
-  --config "$ROOT/res/config_${GEOM}.txt" --n-spectral "$NS" --n-boundary "$NB" --outdir "$R" \
+  --config "$ROOT/res/config_${GEOM}.txt" --n-spectral "$NS" --n-boundary "$NB" --outdir "$R" --opt-noise \
   > run.log 2>&1
 log=$(cat run.log); echo "$log"
 dofs=$(echo "$log" | grep -oE 'dofs=[0-9]+' | grep -oE '[0-9]+')
