@@ -92,7 +92,7 @@ def fit(cfg, semiaxes, k, Y, n_spectral):
     bnd_points, bnd_normals = boundary_collocation(semiaxes, cfg.n_boundary)
     X_train = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
 
-    kernel = MaxwellKernel(n_spectral=n_spectral, omega=k, trace="tangential")
+    kernel = MaxwellKernel(n_spectral=n_spectral, wavenumber=k, trace="tangential")
     log_noise = cfg.log_noise
     if cfg.opt_noise:
         log_noise, _ = optimize_log_noise(kernel, log_noise, X_train, Y, cfg.opt_steps)
