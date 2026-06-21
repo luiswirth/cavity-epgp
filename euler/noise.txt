@@ -1,0 +1,6 @@
+# n_spectral n_boundary log_noise  (fixed resolution, sweep over assumed noise)
+256 4096 -12
+256 4096 -9
+256 4096 -6
+256 4096 -3
+256 4096 0

@@ -9,17 +9,22 @@
 #SBATCH --exclusive
 #SBATCH --constraint=EPYC_7742
 #
-#   euler/submit_grid.sh [geom]   # convergence grid
-#   euler/submit_ref.sh  [geom]   # single high-fidelity reference run
+#   euler/submit_grid.sh  [geom]  # convergence grid
+#   euler/submit_ref.sh   [geom]  # single high-fidelity reference run
+#   euler/submit_noise.sh [geom]  # fixed-resolution sweep over assumed noise
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 GEOM=$1; MODE=$2; TASKFILE=$3
-ROOT=$(pwd); R=$ROOT/out/$MODE/$GEOM; mkdir -p "$R" "$ROOT/out/logs"
-read -r NS NB < <(grep -vE '^\s*#|^\s*$' "$ROOT/$TASKFILE" | sed -n "${SLURM_ARRAY_TASK_ID}p")
+ROOT=$(pwd)
+# taskfile columns: n_spectral n_boundary [log_noise]; log_noise only for noise mode
+read -r NS NB LN < <(grep -vE '^\s*#|^\s*$' "$ROOT/$TASKFILE" | sed -n "${SLURM_ARRAY_TASK_ID}p")
+R=$ROOT/out/$MODE/$GEOM; NOISE_ARG=""
+if [[ "$MODE" == "noise" ]]; then R=$R/ln${LN}; NOISE_ARG="--log-noise ${LN}"; fi
+mkdir -p "$R" "$ROOT/out/logs"
 work=$R/work/ns${NS}_nb${NB}; rm -rf "$work"; mkdir -p "$work"; cd "$work"
 srun --cpu-bind=cores /usr/bin/time -f "elapsed=%e mem=%M" -o time.txt \
   uv run --project "$ROOT" epgp-operator operator \
-  --config "$ROOT/res/config_${GEOM}.txt" --n-spectral "$NS" --n-boundary "$NB" --outdir "$R" --opt-noise \
+  --config "$ROOT/res/config_${GEOM}.txt" --n-spectral "$NS" --n-boundary "$NB" --outdir "$R" ${NOISE_ARG} \
   > run.log 2>&1
 log=$(cat run.log); echo "$log"
 dofs=$(echo "$log" | grep -oE 'dofs=[0-9]+' | grep -oE '[0-9]+')
