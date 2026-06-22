@@ -224,6 +224,33 @@ def run_field(args):
     print(f"wrote {args.out}  (slice {ng}x{ng}, source={z.tolist()}, pol={p.tolist()})")
 
 
+# --- subcommand: wavenumber sweep ---------------------------------------------
+
+def run_ksweep(args):
+    """Sweep the wavenumber at fixed resolution, recording the conditioning
+    system's condition number per k (a resonance indicator). No operator solve:
+    the factor depends only on kernel, boundary, k and noise, not on the data."""
+    _, semiaxes, *_ = load_config(args.config)
+    cfg = GPConfig.from_args(args)
+    bnd_points, bnd_normals = boundary_collocation(semiaxes, cfg.n_boundary)
+    X_train = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
+    Y = jnp.zeros((3 * cfg.n_boundary, 1))  # dummy: L is data-independent
+    ks = np.linspace(args.kmin, args.kmax, args.nk)
+    os.makedirs(args.outdir, exist_ok=True)
+    out = os.path.join(args.outdir, "ksweep.csv")
+    with open(out, "w") as f:
+        f.write("k,cond\n")
+        for k in ks:
+            kernel = MaxwellKernel(n_spectral=args.n_spectral, wavenumber=float(k),
+                                   trace="tangential")
+            post = GaussianProcess(kernel, log_noise=cfg.log_noise).condition(
+                X_train, Y, jitter=JITTER)
+            cond = float(np.linalg.cond(np.asarray(post.L @ post.L.conj().T)))
+            f.write(f"{k:.6f},{cond:.6e}\n")
+            print(f"k={k:.4f} cond={cond:.6e}")
+    print(f"wrote {out}")
+
+
 # --- CLI ----------------------------------------------------------------------
 
 def add_common(sp):
@@ -252,6 +279,14 @@ def main():
     fld.add_argument("--batch", type=int, default=4000)
     fld.add_argument("--out", default="out/ellipse/field.npz")
     fld.set_defaults(func=run_field)
+
+    ks = sub.add_parser("ksweep", help="sweep wavenumber, record conditioning")
+    add_common(ks)
+    ks.add_argument("--kmin", type=float, default=0.25)
+    ks.add_argument("--kmax", type=float, default=4.0)
+    ks.add_argument("--nk", type=int, default=200)
+    ks.add_argument("--outdir", default="out/ksweep/ellipse")
+    ks.set_defaults(func=run_ksweep)
 
     args = ap.parse_args()
     args.func(args)
