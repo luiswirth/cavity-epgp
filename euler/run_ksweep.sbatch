@@ -4,10 +4,8 @@
 #SBATCH --output=out/logs/slurm-%A.log
 #SBATCH --time=04:00:00
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=128
+#SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=2G
-#SBATCH --exclusive
-#SBATCH --constraint=EPYC_7742
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
 GEOM=$1
