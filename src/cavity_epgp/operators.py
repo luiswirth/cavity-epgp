@@ -32,8 +32,10 @@ def load_config(path):
     with open(path) as f:
         lines = [ln for ln in f if not ln.startswith("#")]
     k, a, b, c, _n = lines[0].split()
+    n = int(_n)
     semiaxes = np.array([float(a), float(b), float(c)])
     data = np.array([[float(v) for v in ln.split()] for ln in lines[1:]])
+    assert len(data) == n, f"config declares N={n} but has {len(data)} rows"
     return float(k), semiaxes, data[:, 0:3], data[:, 3:6], data[:, 6:9]
 
 
@@ -191,25 +193,41 @@ def run_field(args):
     print(f"wrote {args.out}  (slice {ng}x{ng}, source={z.tolist()}, pol={p.tolist()})")
 
 
+def _interior_points(semiaxes, n_per_shell, shells=(0.4, 0.7)):
+    pts = [np.asarray(fibonacci_sphere(n_per_shell)) * semiaxes * s for s in shells]
+    return np.concatenate(pts, axis=0)
+
+
 def run_ksweep(args):
+    """Betcke-Trefethen subspace angle method for PEC cavity resonance detection.
+
+    At each k, orthonormalize [boundary_trace; interior_field] and compute
+    sigma_min of the boundary block. This dips to ~0 at cavity resonances
+    without confounding basis overcompleteness with physical resonances.
+    """
     _, semiaxes, *_ = load_config(args.config)
-    cfg = GPConfig.from_args(args)
-    bnd_points, bnd_normals = boundary_collocation(semiaxes, cfg.n_boundary)
-    X_train = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
-    Y = jnp.zeros((3 * cfg.n_boundary, 1))  # L depends only on kernel/boundary/k, not data
+    R = float(np.max(semiaxes))
     ks = np.linspace(args.kmin, args.kmax, args.nk)
     os.makedirs(args.outdir, exist_ok=True)
     out = os.path.join(args.outdir, "ksweep.csv")
     with open(out, "w") as f:
-        f.write("k,cond\n")
+        f.write("k,sigma_min\n")
         for k in ks:
-            kernel = MaxwellKernel(n_spectral=args.n_spectral, wavenumber=float(k),
-                                   trace="tangential")
-            post = GaussianProcess(kernel, log_noise=cfg.log_noise).condition(
-                X_train, Y, jitter=JITTER)
-            cond = float(np.linalg.cond(np.asarray(post.L @ post.L.conj().T)))
-            f.write(f"{k:.6f},{cond:.6e}\n")
-            print(f"k={k:.4f} cond={cond:.6e}")
+            n_spec = int(min(args.nmax, max(args.nmin, round(args.alpha * (k * R) ** 2))))
+            n_b = int(max(250, round(args.oversample * 2 * n_spec / 3)))
+            n_i = max(40, n_spec // 4)
+            bnd_points, bnd_normals = boundary_collocation(semiaxes, n_b)
+            Xb = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
+            Xi = jnp.asarray(_interior_points(semiaxes, n_i))
+            fm = MaxwellKernel(n_spectral=n_spec, wavenumber=float(k)).feature_map
+            Ab = np.asarray(fm.tangential(Xb)).T   # (3*n_b, F)
+            Ai = np.asarray(fm.full(Xi)).T          # (6*n_i, F)
+            M = np.vstack([Ab, Ai])
+            Q, _ = np.linalg.qr(M, mode="reduced")
+            Qb = Q[: Ab.shape[0], :]
+            s = float(np.linalg.svd(Qb, compute_uv=False).min())
+            f.write(f"{k:.6f},{s:.6e}\n")
+            print(f"k={k:.4f} n_spec={n_spec:>4} sigma_min={s:.6e}")
     print(f"wrote {out}")
 
 
@@ -240,11 +258,17 @@ def main():
     fld.add_argument("--out", default="out/ellipse/field.npz")
     fld.set_defaults(func=run_field)
 
-    ks = sub.add_parser("ksweep", help="sweep wavenumber, record conditioning")
-    add_common(ks)
+    ks = sub.add_parser("ksweep", help="sweep wavenumber, record minimum subspace angle")
+    ks.add_argument("--config", default="res/config_ellipse.txt")
     ks.add_argument("--kmin", type=float, default=0.25)
     ks.add_argument("--kmax", type=float, default=4.0)
     ks.add_argument("--nk", type=int, default=200)
+    ks.add_argument("--alpha", type=float, default=1.2,
+                    help="n_spectral ~ alpha*(k*R)^2")
+    ks.add_argument("--nmin", type=int, default=40)
+    ks.add_argument("--nmax", type=int, default=600)
+    ks.add_argument("--oversample", type=float, default=3.5,
+                    help="n_boundary = oversample * 2*n_spectral/3")
     ks.add_argument("--outdir", default="out/ksweep/ellipse")
     ks.set_defaults(func=run_ksweep)
 
