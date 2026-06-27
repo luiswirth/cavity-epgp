@@ -1,12 +1,3 @@
-"""Shared dipole physics: the dyadic Green's function and incident field.
-
-These mirror the C++ reference in cavity-bem/src/main.cpp one-to-one
-(green_scalar / green_dyadic / incident_field) so the two solvers excite with
-the identical analytic dipole field. The single-point forms below are the
-readable counterpart of the C++; incident_field_batch is the vectorized version
-the EPGP solver actually calls for boundary data and field evaluation.
-"""
-
 import numpy as np
 
 

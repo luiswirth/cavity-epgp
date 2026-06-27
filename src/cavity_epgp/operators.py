@@ -1,12 +1,3 @@
-"""EPGP reaction-operator assembly for the PEC ellipsoidal cavity.
-
-Drives the maxwellgp Maxwell-constrained Gaussian process: builds the boundary
-data from the analytic incident field, conditions the GP on the tangential
-trace, and reads off the dipole reaction operator T. The plane-wave directions
-and boundary collocation are the solver's private discretization; the shared
-benchmark geometry (Lambda points, k, semi-axes) comes from the config file.
-"""
-
 import argparse
 import os
 from dataclasses import dataclass
@@ -27,8 +18,6 @@ JITTER = 1e-8
 
 @dataclass
 class GPConfig:
-    """Maxwell-GP conditioning hyperparameters (the solver's private settings)."""
-
     n_boundary: int = 1200
     log_noise: float = -12.0
     opt_noise: bool = False
@@ -38,8 +27,6 @@ class GPConfig:
     def from_args(cls, args):
         return cls(args.n_boundary, args.log_noise, args.opt_noise, args.opt_steps)
 
-
-# --- geometry / boundary data -------------------------------------------------
 
 def load_config(path):
     with open(path) as f:
@@ -59,12 +46,9 @@ def boundary_collocation(semiaxes, n):
 
 
 def tangential_trace(Ei, normals):
-    """Tangential trace of the (negated) incident field: PEC boundary data."""
     En = np.sum(Ei * normals, axis=1, keepdims=True)
     return -(Ei - En * normals)
 
-
-# --- conditioning (shared fit) ------------------------------------------------
 
 def optimize_log_noise(kernel, log_noise0, X_train, Y, steps, lr=0.05):
     ln = jnp.asarray(log_noise0)
@@ -88,7 +72,6 @@ def optimize_log_noise(kernel, log_noise0, X_train, Y, steps, lr=0.05):
 
 
 def fit(cfg, semiaxes, k, Y, n_spectral):
-    """Build the boundary, condition the Maxwell-GP, return (model, posterior)."""
     bnd_points, bnd_normals = boundary_collocation(semiaxes, cfg.n_boundary)
     X_train = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
 
@@ -100,8 +83,6 @@ def fit(cfg, semiaxes, k, Y, n_spectral):
     model = GaussianProcess(kernel, log_noise=log_noise)
     return model, model.condition(X_train, Y, jitter=JITTER)
 
-
-# --- reaction operator assembly -----------------------------------------------
 
 def _nlml(post, model, Y):
     # Marginal likelihood reusing the conditioned factor (no re-factorization):
@@ -117,13 +98,6 @@ def _nlml(post, model, Y):
 
 
 def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
-    """Assemble the dipole reaction operator T for one (k, n_spectral).
-
-    Returns (T, Sigma, nlml, posterior, model); Sigma is the posterior covariance
-    of the operator entries (transmitter-independent), nlml the marginal
-    likelihood of the boundary fit, the posterior carries the conditioned factor
-    used for the system condition number, the model the noise level.
-    """
     configs = []
     for i in range(len(points)):
         n = points[i] / np.linalg.norm(points[i])
@@ -140,8 +114,6 @@ def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
 
     X_query = jnp.asarray(np.stack([np.concatenate([x, nrm]) for x, nrm, _ in configs]))
     Q = jnp.asarray(np.stack([q for _, _, q in configs]))
-    # polarization-projected query map: Psi[:, i] sums the 3 tangential
-    # components at receiver i weighted by its polarization Q[i].
     Phi_q = model.kernel.features(X_query).reshape(-1, n_cfg, 3)
     Psi = jnp.einsum("fic,ic->fi", Phi_q, Q)
     T = np.asarray(post.mean(Psi))
@@ -150,11 +122,8 @@ def assemble_operator(cfg, semiaxes, k, points, e1, e2, n_spectral):
     return T, Sigma, nlml, post, model
 
 
-# --- subcommand: reaction operator --------------------------------------------
-
 def run_operator(args):
-    """One grid point: assemble T at (n_spectral, n_boundary), save it, and print
-    dofs and cond for the run harness (secs and mem come from /usr/bin/time)."""
+    # secs and mem are captured by /usr/bin/time in the run harness, not here.
     ns, nb = args.n_spectral, args.n_boundary
     k, semiaxes, points, e1, e2 = load_config(args.config)
     cfg = GPConfig.from_args(args)
@@ -175,8 +144,6 @@ def run_operator(args):
     print(f"nlml={nlml:.6e}")
     print(f"wrote {out}")
 
-
-# --- subcommand: field slice --------------------------------------------------
 
 def run_field(args):
     k, semiaxes, *_ = load_config(args.config)
@@ -204,7 +171,7 @@ def run_field(args):
     field6 = np.concatenate(mean_chunks).reshape(-1, 6)
     var6 = np.concatenate(var_chunks).reshape(-1, 6)
     Escat = field6[:, :3]
-    Escat_std = np.sqrt(var6[:, :3])  # posterior std of the scattered E field
+    Escat_std = np.sqrt(var6[:, :3])
     Einc = incident_field_batch(pts, z, k, p)
     Etot = Einc + Escat
 
@@ -224,17 +191,12 @@ def run_field(args):
     print(f"wrote {args.out}  (slice {ng}x{ng}, source={z.tolist()}, pol={p.tolist()})")
 
 
-# --- subcommand: wavenumber sweep ---------------------------------------------
-
 def run_ksweep(args):
-    """Sweep the wavenumber at fixed resolution, recording the conditioning
-    system's condition number per k (a resonance indicator). No operator solve:
-    the factor depends only on kernel, boundary, k and noise, not on the data."""
     _, semiaxes, *_ = load_config(args.config)
     cfg = GPConfig.from_args(args)
     bnd_points, bnd_normals = boundary_collocation(semiaxes, cfg.n_boundary)
     X_train = jnp.asarray(np.concatenate([bnd_points, bnd_normals], axis=1))
-    Y = jnp.zeros((3 * cfg.n_boundary, 1))  # dummy: L is data-independent
+    Y = jnp.zeros((3 * cfg.n_boundary, 1))  # L depends only on kernel/boundary/k, not data
     ks = np.linspace(args.kmin, args.kmax, args.nk)
     os.makedirs(args.outdir, exist_ok=True)
     out = os.path.join(args.outdir, "ksweep.csv")
@@ -250,8 +212,6 @@ def run_ksweep(args):
             print(f"k={k:.4f} cond={cond:.6e}")
     print(f"wrote {out}")
 
-
-# --- CLI ----------------------------------------------------------------------
 
 def add_common(sp):
     sp.add_argument("--config", default="res/config_ellipse.txt")
