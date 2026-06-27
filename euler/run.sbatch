@@ -1,4 +1,7 @@
 #!/bin/bash
+# === SLURM site config (ETH Euler) ===========================================
+# Edit --account and --constraint below for a different cluster; drop them to
+# run locally via ../run_local.sh.
 #SBATCH --job-name=epgp
 #SBATCH --account=ls_math
 #SBATCH --output=out/logs/slurm-%A_%a.log
@@ -8,6 +11,7 @@
 #SBATCH --mem-per-cpu=2G
 #SBATCH --exclusive
 #SBATCH --constraint=EPYC_7742
+# =============================================================================
 #
 #   euler/submit_grid.sh  [geom]  # convergence grid
 #   euler/submit_ref.sh   [geom]  # single high-fidelity reference run

@@ -1,4 +1,5 @@
 #!/bin/bash
+# SLURM site config (ETH Euler): edit --account for a different cluster.
 #SBATCH --job-name=epgp-ksweep
 #SBATCH --account=ls_math
 #SBATCH --output=out/logs/slurm-%A.log

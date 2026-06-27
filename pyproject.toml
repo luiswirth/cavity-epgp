@@ -21,4 +21,6 @@ requires = ["uv_build>=0.11.17,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
-maxwellgp = { git = "ssh://git@github.com/luiswirth/maxwellgp.git", branch = "main" }
+# https so a fresh clone resolves without a GitHub SSH key. For local development
+# against a sibling checkout, override with: maxwellgp = { path = "../maxwellgp", editable = true }
+maxwellgp = { git = "https://github.com/luiswirth/maxwellgp.git", branch = "main" }
