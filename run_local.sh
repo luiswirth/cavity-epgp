@@ -1,9 +1,9 @@
 #!/bin/bash
-# Run the EP-GP convergence grid (or reference / noise sweep) locally, without SLURM.
+# Run the EP-GP convergence grid (or field slice / noise sweep) locally, without SLURM.
 # Serial port of euler/run.sbatch for reproduction on any machine.
 #
 #   ./run_local.sh grid  [geom...]   # 2D (N_s, N_b) convergence grid
-#   ./run_local.sh ref   [geom...]   # single high-fidelity reference run + field slice
+#   ./run_local.sh field [geom...]   # field slice at the highest-fidelity grid config
 #   ./run_local.sh noise [geom...]   # fixed-resolution sweep over assumed noise
 #
 # geom defaults to: ellipse sphere. Requires uv (https://docs.astral.sh/uv/).
@@ -12,9 +12,9 @@ set -euo pipefail
 MODE="${1:-grid}"; shift || true
 case "$MODE" in
   grid)  TASKFILE=euler/grid.txt;;
-  ref)   TASKFILE=euler/ref.txt;;
+  field) TASKFILE=euler/field.txt;;
   noise) TASKFILE=euler/noise.txt;;
-  *) echo "usage: $0 grid|ref|noise [geom...]" >&2; exit 1;;
+  *) echo "usage: $0 grid|field|noise [geom...]" >&2; exit 1;;
 esac
 [[ $# -eq 0 ]] && set -- ellipse sphere
 
@@ -44,7 +44,7 @@ for geom in "$@"; do
     echo "${NS},${NB},${dofs},${SECONDS},,${cond}" >> "$R/manifest.csv"
     echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hostname),${NS},${NB},$(date -Is),${log_noise},${nlml}" >> "$R/provenance.csv"
     echo "done ns${NS}nb${NB}: dofs=$dofs cond=$cond secs=${SECONDS}"
-    if [[ "$MODE" == ref ]]; then
+    if [[ "$MODE" == field ]]; then
       uv run --project "$ROOT" epgp-operator field \
         --config "$ROOT/res/config_${geom}.txt" --n-spectral "$NS" --n-boundary "$NB" \
         --source 0 0 1 --pol 1 0 0 --out "$R/field.npz"

@@ -1,2 +1,0 @@
-# N_s N_b  (single high-fidelity reference run, off the convergence grid)
-2048 16384

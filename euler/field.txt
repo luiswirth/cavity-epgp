@@ -1,0 +1,2 @@
+# N_s N_b  (field slice at the highest-fidelity grid config)
+1024 8192

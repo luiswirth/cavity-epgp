@@ -14,7 +14,7 @@
 # =============================================================================
 #
 #   euler/submit_grid.sh  [geom]  # convergence grid
-#   euler/submit_ref.sh   [geom]  # single high-fidelity reference run
+#   euler/submit_field.sh [geom]  # field slice at the highest-fidelity grid config
 #   euler/submit_noise.sh [geom]  # fixed-resolution sweep over assumed noise
 set -euo pipefail
 export PATH="$HOME/.local/bin:$PATH"
@@ -42,7 +42,7 @@ echo "${NS},${NB},${dofs},${secs},${mem_kb},${cond}" >> "$R/manifest.csv"
 # provenance columns: git,host,n_spectral,n_boundary,date,log_noise,nlml
 echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hostname),${NS},${NB},$(date -Is),${log_noise},${nlml}" >> "$R/provenance.csv"
 echo "done ns${NS}nb${NB}: dofs=$dofs cond=$cond secs=$secs mem_kb=$mem_kb"
-if [[ "$MODE" == "ref" ]]; then
+if [[ "$MODE" == "field" ]]; then
   srun uv run --project "$ROOT" epgp-operator field \
     --config "$ROOT/res/config_${GEOM}.txt" --n-spectral "$NS" --n-boundary "$NB" \
     --source 0 0 1 --pol 1 0 0 \
