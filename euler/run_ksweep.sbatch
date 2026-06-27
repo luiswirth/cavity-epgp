@@ -15,6 +15,6 @@ R=$ROOT/out/ksweep/$GEOM
 rm -rf "$R"; mkdir -p "$R" "$ROOT/out/logs"
 srun --cpu-bind=cores uv run --project "$ROOT" epgp-operator ksweep \
   --config "$ROOT/res/config_${GEOM}.txt" \
-  --kmin 1.5 --kmax 2.5 --nk 400 --outdir "$R"
+  --kmin 1.5 --kmax 2.5 --nk 400 --alpha 4.0 --nmax 1200 --outdir "$R"
 echo "$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || echo unknown),$(hostname),$(date -Is)" \
   > "$R/provenance.csv"
